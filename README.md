@@ -1,220 +1,239 @@
-﻿# SPG Daily Reporting Automation Bot
+# 📊 SPG Daily Reporting Automation Bot
 
 > A Python-based Telegram bot that **automates daily SPG attendance and KPI reporting**, parsing structured messages and syncing data directly to **Google Sheets** via the Google Sheets API.
 
 ---
 
-## Overview
+## 📋 Overview
 
 In a typical field sales operation, SPG (Sales Promotion Girls/Boys) supervisors collect daily reports through Telegram group chats. These reports contain attendance statuses and KPI metrics (Selling, Call, EC) that must be manually entered into spreadsheets — a repetitive and error-prone process.
 
-This bot eliminates that manual work entirely.
+**This bot eliminates that manual work entirely.**
 
 ---
 
-## Features
+## ✨ Features
 
-- **Auto-parse laporan harian** — baca format laporan dari Telegram dan ekstrak data otomatis
-- **Multi-report dalam satu pesan** — mendukung laporan banyak SPG sekaligus
-- **Flexible parsing** — toleran terhadap variasi spasi, format huruf, dan typo ringan
-- **Attendance status** — input status HADIR / SAKIT / IJIN / CUTI / ALFA / OFF
-- **Bulk OFF command** — liburkan semua SPG sekaligus dengan semua off
-- **Google Sheets sync** — data langsung masuk ke sheet yang tepat, di baris yang benar
-- **Session caching** — koneksi Google Sheets di-cache agar lebih efisien
-- **Secure config** — semua credential diambil dari environment variable, tidak ada yang hard-coded
-
----
-
-## Tech Stack
-
-| Layer              | Technology                       |
-|--------------------|----------------------------------|
-| Language           | Python 3.11+                     |
-| Telegram API       | python-telegram-bot 20.x (async) |
-| Google Sheets API  | gspread + oauth2client           |
-| Auth               | Google Service Account (OAuth2)  |
-| Config Management  | python-dotenv                    |
-| Parsing            | Built-in re (regex)              |
+| Feature | Description |
+|---------|-------------|
+| 📥 Auto-Parse Reports | Reads structured reports from Telegram and extracts data automatically |
+| 📦 Multi-Report | Supports multiple SPG reports in a single message |
+| 🔍 Flexible Parsing | Tolerant of spacing, casing, and minor format variations |
+| ✅ Attendance Status | HADIR / SAKIT / IJIN / CUTI / ALFA / OFF |
+| 💤 Bulk OFF | Mark all SPG as OFF with a single command |
+| 📊 Google Sheets Sync | Data goes directly into the correct sheet and row |
+| ⚡ Session Caching | Cached Google Sheets connection for efficiency |
+| 🔒 Secure Config | All credentials loaded from environment variables |
 
 ---
 
-## How It Works
+## 🛠️ Tech Stack
 
-`
-Telegram Message
-      │
-      ▼
-  handle_message()
-      │
-      ├─► "semua off"        → bulk OFF untuk semua SPG
-      │
-      ├─► "FORMAT REPORT"    → parse_semua_laporan()
-      │         │                   │
-      │         │              Regex parser
-      │         │            (nama, selling, call, ec)
-      │         │                   │
-      │         └──────────── cari_spg() ──► input_ke_sheet()
-      │
-      └─► "maria sakit"      → cari_spg() ──► input_ke_sheet()
-                                                    │
-                                              get_sheet() (cached)
-                                                    │
-                                           Google Sheets API
-`
+| Layer | Technology |
+|-------|------------|
+| Language | Python 3.11+ |
+| Telegram API | python-telegram-bot 20.x (async) |
+| Google Sheets API | gspread + oauth2client |
+| Authentication | Google Service Account (OAuth2) |
+| Config Management | python-dotenv |
+| Text Parsing | Built-in `re` (regex) |
 
 ---
 
-## Example Usage
+## 🏗️ Architecture
 
-**Format Laporan Harian:**
-`
-FORMAT REPORT SPG = MARIA
+```mermaid
+flowchart TD
+    A["📱 Telegram Message"] --> B["handle_message"]
+    B -->|semua off| C["💤 Bulk OFF - All SPG"]
+    B -->|FORMAT REPORT| D["parse_semua_laporan"]
+    B -->|rina sakit| E["cari_spg"]
+
+    D --> F["Regex Parser"]
+    F --> G["cari_spg"]
+    G --> H["input_ke_sheet"]
+    E --> H
+
+    C --> I["input_ke_sheet - loop all SPG"]
+
+    H --> J["get_sheet - cached"]
+    I --> J
+    J --> K["📊 Google Sheets API"]
+    K --> L["✅ Data Saved"]
+```
+
+---
+
+## 📝 Example Usage
+
+### Daily Report
+
+```text
+FORMAT REPORT SPG = RINA
 TOTAL SELLING = 25
 TOTAL CALL    = 40
 TOTAL EC      = 12
-`
+```
 
-**Multi-report dalam satu pesan:**
-`
-FORMAT REPORT SPG = NOVI
+### Multiple Reports in One Message
+
+```text
+FORMAT REPORT SPG = BUDI
 TOTAL SELLING = 30
 TOTAL CALL = 45
 TOTAL EC = 8
 
-FORMAT REPORT SPG = AGUS
+FORMAT REPORT SPG = EKO
 TOTAL SELLING = 20
 TOTAL CALL = 33
 TOTAL EC = 5
-`
+```
 
-**Status Absensi:**
-`
-maria sakit
-agus off
-novi ijin
-`
+### Attendance Status
 
-**Libur Massal:**
-`
+```text
+rina sakit
+budi off
+dewi ijin
+```
+
+### Bulk OFF
+
+```text
 semua off
-`
+```
 
 ---
 
-## Google Sheets Structure
+## 📊 Google Sheets Mapping
 
-Data ditulis mulai kolom **G** sampai **S**:
+Data is written to columns **G** through **S**:
 
-| Kolom | Field         |
-|-------|---------------|
-| G     | Nama SPG      |
-| H     | Keterangan    |
-| I     | Program       |
-| J     | Wilayah       |
-| K     | Minggu ke-    |
-| L     | Tanggal       |
-| M     | ID Toko       |
-| N     | Nama Toko     |
-| O     | Total Selling |
-| R     | Total Call    |
-| S     | Total EC      |
+| Column | Field | Example |
+|--------|-------|---------|
+| G | Nama SPG | Rina Kartika |
+| H | Keterangan | HADIR |
+| I | Program | GROSIR |
+| J | Wilayah | CIREBON |
+| K | Minggu ke- | 3 |
+| L | Tanggal | 19 Agustus 2026 |
+| M | ID Toko | 7001001/7001002 |
+| N | Nama Toko | TOKO MAKMUR (M2) |
+| O | Total Selling | 25 |
+| P | *(reserved)* | |
+| Q | *(reserved)* | |
+| R | Total Call | 40 |
+| S | Total EC | 12 |
 
 ---
 
-## Installation
+## 🚀 Installation
 
-**1. Clone repository**
-`ash
-git clone https://github.com/YOUR_USERNAME/telegram-spg-reporting-bot.git
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/stevendiyanto76-oss/telegram-spg-reporting-bot.git
 cd telegram-spg-reporting-bot
-`
+```
 
-**2. Buat virtual environment**
-`ash
+### 2. Create a virtual environment
+
+```bash
 python -m venv venv
-venv\Scripts\activate       # Windows
-source venv/bin/activate    # Linux/Mac
-`
 
-**3. Install dependencies**
-`ash
+# Windows
+venv\Scripts\activate
+
+# Linux / Mac
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
-`
+```
 
-**4. Setup environment variables**
-`ash
+### 4. Configure environment variables
+
+```bash
 cp .env.example .env
-# Edit file .env dan isi semua nilai yang diperlukan
-`
+```
 
-**5. Setup Google Service Account**
-- Buka [Google Cloud Console](https://console.cloud.google.com/)
-- Buat Service Account dan download file JSON credentials
-- Aktifkan Google Sheets API dan Google Drive API
-- Share spreadsheet dengan email Service Account
-- Letakkan file JSON credentials di folder proyek (jangan commit!)
+Then edit `.env` and fill in all required values.
 
-**6. Jalankan bot**
-`ash
+### 5. Setup Google Service Account
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project and enable **Google Sheets API** + **Google Drive API**
+3. Create a **Service Account** and download the JSON key file
+4. Share your Google Spreadsheet with the Service Account email (as Editor)
+5. Place the JSON file in the project directory (it is excluded by `.gitignore`)
+
+> See [`config/README.md`](config/README.md) for detailed step-by-step instructions.
+
+### 6. Run the bot
+
+```bash
 python bot.py
-`
+```
 
 ---
 
-## Environment Variables
+## 🔑 Environment Variables
 
-| Variable                    | Description                                    |
-|-----------------------------|------------------------------------------------|
-| TELEGRAM_BOT_TOKEN        | Token dari @BotFather                          |
-| GOOGLE_SERVICE_ACCOUNT_FILE | Path ke file JSON credentials               |
-| GOOGLE_SHEET_ID           | ID Google Spreadsheet (dari URL)               |
-| GOOGLE_SHEET_NAME         | Nama worksheet/tab di spreadsheet              |
-
----
-
-## Security
-
-> Pastikan hal-hal berikut **TIDAK pernah** masuk ke repository:
-> - File .env
-> - File JSON credentials Google Service Account
-> - Token Telegram yang nyata
-> - Data internal perusahaan atau pelanggan
-
-File .gitignore sudah dikonfigurasi untuk mencegah ini secara otomatis.
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | Path to the JSON credentials file |
+| `GOOGLE_SHEET_ID` | Google Spreadsheet ID (from the URL) |
+| `GOOGLE_SHEET_NAME` | Worksheet / tab name inside the spreadsheet |
 
 ---
 
-## Project Structure
+## 🛡️ Security
 
-`
+> **⚠️ The following must NEVER be committed to the repository:**
+> - `.env` file (contains real tokens)
+> - Google Service Account JSON credentials
+> - Real Telegram bot tokens
+> - Internal company or customer data
+
+The included `.gitignore` is pre-configured to prevent accidental commits of these files.
+
+---
+
+## 📁 Project Structure
+
+```text
 telegram-spg-reporting-bot/
 ├── bot.py                  # Main application
 ├── requirements.txt        # Python dependencies
-├── .env.example            # Template environment variables
-├── .gitignore              # Git exclusions
-├── README.md               # Documentation
+├── .env.example            # Template for environment variables
+├── .gitignore              # Git exclusion rules
+├── README.md               # This file
 ├── config/
-│   └── README.md           # Petunjuk konfigurasi Google API
+│   └── README.md           # Google API setup guide
 └── docs/
-    └── architecture.md     # Diagram arsitektur sistem
-`
+    └── architecture.md     # System architecture diagram
+```
 
 ---
 
-## Future Improvements
+## 💡 Future Improvements
 
-- [ ] Database lokal (SQLite) sebagai backup sebelum sync ke Sheets
-- [ ] Dashboard ringkasan mingguan via command /summary
-- [ ] Notifikasi otomatis jika ada SPG belum lapor sampai jam tertentu
-- [ ] Support multi-wilayah / multi-sheet
-- [ ] Unit tests untuk parser laporan
-- [ ] Docker support untuk deployment ke VPS
+- [ ] Local SQLite database as a backup before syncing to Sheets
+- [ ] Weekly summary dashboard via `/summary` command
+- [ ] Auto-reminder if any SPG hasn't reported by a certain time
+- [ ] Multi-region / multi-sheet support
+- [ ] Unit tests for the report parser
+- [ ] Docker support for VPS deployment
 
 ---
 
-## License
+## 📄 License
 
-MIT License — bebas digunakan dan dimodifikasi dengan menyertakan atribusi.
+MIT License — free to use and modify with attribution.
 
 ---
 

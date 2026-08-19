@@ -1,10 +1,10 @@
-﻿"""
+"""
 SPG Daily Reporting Automation Bot
 ===================================
 Telegram bot that automates daily SPG attendance and KPI reporting
 directly into Google Sheets via the Google Sheets API.
 
-Author  : Hari Diyanto
+Author  : Steven Diyanto
 License : MIT
 """
 
@@ -30,9 +30,9 @@ from telegram.ext import (
 # -----------------------------------------------------------------
 load_dotenv()
 
-TOKEN     = os.getenv("TELEGRAM_BOT_TOKEN")
-JSON_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
-SHEET_ID  = os.getenv("GOOGLE_SHEET_ID")
+TOKEN      = os.getenv("TELEGRAM_BOT_TOKEN")
+JSON_FILE  = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
+SHEET_ID   = os.getenv("GOOGLE_SHEET_ID")
 SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME")
 
 if not all([TOKEN, JSON_FILE, SHEET_ID, SHEET_NAME]):
@@ -52,50 +52,52 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------
-# DATABASE SPG
+# DATABASE SPG (sample / demo data)
 # -----------------------------------------------------------------
+# NOTE: Replace this with your actual SPG roster.
+# Each key is a short alias used for quick matching in messages.
 SPG_DATA = {
-    "astutik": {
-        "nama": "Astutik Wulandari",
+    "rina": {
+        "nama": "Rina Kartika",
         "program": "GROSIR",
-        "id_toko": "6038328/6006395",
-        "nama_toko": "YENI NURHAENI TK (M2), JENI H. (M2)",
+        "id_toko": "7001001/7001002",
+        "nama_toko": "TOKO MAKMUR (M2), TOKO SEJAHTERA (M2)",
     },
-    "novi": {
-        "nama": "NOVI LIYANTI",
+    "budi": {
+        "nama": "Budi Santoso",
         "program": "GROSIR",
-        "id_toko": "6038301/6013634",
-        "nama_toko": "AMEX (M2), DIAN (M4)",
+        "id_toko": "7002001/7002002",
+        "nama_toko": "SUMBER REZEKI (M2), BERKAH JAYA (M4)",
     },
-    "adam": {
-        "nama": "MOCHAMMAD ADAM RAHARDJO",
+    "dewi": {
+        "nama": "Dewi Lestari",
         "program": "GROSIR",
-        "id_toko": "6046852/6001414",
-        "nama_toko": "NOVI (M245), YUYUM (M2)",
+        "id_toko": "7003001/7003002",
+        "nama_toko": "MAJU BERSAMA (M245), CAHAYA (M2)",
     },
-    "ruswanto": {
-        "nama": "RUSWANTO",
+    "hendra": {
+        "nama": "Hendra Wijaya",
         "program": "GROSIR",
-        "id_toko": "6003472/6003465",
-        "nama_toko": "TANIA (M2), AHMAD (M2)",
+        "id_toko": "7004001/7004002",
+        "nama_toko": "SINAR ABADI (M2), MANDIRI (M2)",
     },
-    "maria": {
-        "nama": "Maria Ulfah",
+    "sari": {
+        "nama": "Sari Rahmawati",
         "program": "PASAR",
-        "id_toko": "6003307/6003311",
-        "nama_toko": "SILVI PLASTIK (M2), MAMAH ANITA (M2)",
+        "id_toko": "7005001/7005002",
+        "nama_toko": "PRIMA PLASTIK (M2), ANUGRAH (M2)",
     },
-    "agus": {
-        "nama": "Agus Kumaedi",
+    "eko": {
+        "nama": "Eko Prasetyo",
         "program": "GROSIR",
-        "id_toko": "6028754/6002836",
-        "nama_toko": "CV. ADE YOPI KAVILI, HESTY (M2)",
+        "id_toko": "7006001/7006002",
+        "nama_toko": "CV. SENTOSA JAYA, HARAPAN (M2)",
     },
-    "ummu": {
-        "nama": "Ummu Sulem Aulistin",
+    "nita": {
+        "nama": "Nita Permatasari",
         "program": "PASAR",
-        "id_toko": "6031227/6003216",
-        "nama_toko": "BINA NIAGA CELANCANG (M2) / HELEN (PLASTIK) (M2)",
+        "id_toko": "7007001/7007002",
+        "nama_toko": "BINA USAHA (M2) / MELATI (M2)",
     },
 }
 
@@ -103,12 +105,12 @@ SPG_DATA = {
 # STATUS KEHADIRAN
 # -----------------------------------------------------------------
 STATUS_MAP = {
-    "sakit" : "SAKIT DENGAN SURAT DOKTER",
-    "ijin"  : "IJIN",
-    "izin"  : "IJIN",
-    "cuti"  : "CUTI",
-    "alfa"  : "ALFA",
-    "off"   : "OFF",
+    "sakit": "SAKIT DENGAN SURAT DOKTER",
+    "ijin":  "IJIN",
+    "izin":  "IJIN",
+    "cuti":  "CUTI",
+    "alfa":  "ALFA",
+    "off":   "OFF",
 }
 
 # -----------------------------------------------------------------
@@ -123,6 +125,10 @@ _sheet_cache = None
 
 
 def get_sheet():
+    """
+    Return a cached Google Sheets worksheet object.
+    Re-authenticates automatically if the session has expired.
+    """
     global _sheet_cache
     try:
         if _sheet_cache is not None:
@@ -143,6 +149,7 @@ def get_sheet():
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------
 def get_week(tanggal):
+    """Return week number (1-5) based on day of month."""
     day = tanggal.day
     if day <= 7:  return 1
     if day <= 14: return 2
@@ -152,12 +159,16 @@ def get_week(tanggal):
 
 
 def format_tanggal(tanggal):
-    bulan = ["","Januari","Februari","Maret","April","Mei","Juni",
-             "Juli","Agustus","September","Oktober","November","Desember"]
+    """Format date to Indonesian string, e.g. '19 Agustus 2026'."""
+    bulan = [
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ]
     return f"{tanggal.day} {bulan[tanggal.month]} {tanggal.year}"
 
 
 def cari_spg(nama_input):
+    """Find SPG by alias key or full name (case-insensitive)."""
     nama_lower = nama_input.lower()
     for key, spg in SPG_DATA.items():
         if key in nama_lower or spg["nama"].lower() in nama_lower:
@@ -166,28 +177,31 @@ def cari_spg(nama_input):
 
 
 def find_next_empty_row(sheet, start_row=6):
+    """Find the next empty row in column G, starting from start_row."""
     col_values = sheet.col_values(7)
     return max(len(col_values) + 1, start_row)
 
 
 def input_ke_sheet(spg, keterangan, selling=None, call=None, ec=None):
-    sheet   = get_sheet()
-    now     = datetime.now()
-    baris   = find_next_empty_row(sheet)
+    """Write one row of SPG report data to Google Sheets (columns G-S)."""
+    sheet = get_sheet()
+    now   = datetime.now()
+    baris = find_next_empty_row(sheet)
+
     row_data = [[
-        spg["nama"],
-        keterangan,
-        spg["program"],
-        "CIREBON",
-        get_week(now),
-        format_tanggal(now),
-        spg["id_toko"],
-        spg["nama_toko"],
-        selling or "",
-        "",
-        "",
-        call or "",
-        ec or "",
+        spg["nama"],        # G - Nama SPG
+        keterangan,         # H - Keterangan kehadiran
+        spg["program"],     # I - Program
+        "CIREBON",          # J - Wilayah
+        get_week(now),      # K - Minggu ke-
+        format_tanggal(now),# L - Tanggal
+        spg["id_toko"],     # M - ID Toko
+        spg["nama_toko"],   # N - Nama Toko
+        selling or "",      # O - Total Selling
+        "",                 # P - (reserved)
+        "",                 # Q - (reserved)
+        call or "",         # R - Total Call
+        ec or "",           # S - Total EC
     ]]
     sheet.update(f"G{baris}:S{baris}", row_data)
     logger.info("Input OK row=%d | %s | %s", baris, spg["nama"], keterangan)
@@ -197,9 +211,22 @@ def input_ke_sheet(spg, keterangan, selling=None, call=None, ec=None):
 # LAPORAN PARSER
 # -----------------------------------------------------------------
 def parse_semua_laporan(text):
+    """
+    Parse one or more SPG report blocks from a Telegram message.
+
+    Supported format (flexible with spacing and casing):
+
+        FORMAT REPORT SPG = RINA
+        TOTAL SELLING = 25
+        TOTAL CALL    = 40
+        TOTAL EC      = 12
+
+    Returns a list of dicts with keys: 'nama', 'selling', 'call', 'ec'.
+    """
     hasil_list = []
     text = re.sub(r"[^\w\s\n=\/\-\(\)\.,:@#%]", " ", text)
 
+    # Split into blocks (one per FORMAT REPORT header)
     bagian = []
     current = []
     for line in text.strip().splitlines():
@@ -219,27 +246,32 @@ def parse_semua_laporan(text):
             line_clean = line.strip()
             line_upper = line_clean.upper()
 
+            # --- Extract SPG name ---
             if "FORMAT REPORT" in line_upper:
                 nama = re.sub(
                     r"FORMAT\s+REPORT\s+(SPG|SPB)\s*[=:]?\s*", "",
-                    line_clean, flags=re.IGNORECASE
+                    line_clean, flags=re.IGNORECASE,
                 ).strip()
                 if not nama and i + 1 < len(lines):
                     nama = lines[i + 1].strip()
                 if nama:
                     hasil["nama"] = nama.title()
 
+            # --- Extract KPIs ---
             elif "TOTAL SELLING" in line_upper:
                 v = "".join(filter(str.isdigit, line_clean.split("=")[-1]))
-                if v: hasil["selling"] = v
+                if v:
+                    hasil["selling"] = v
 
             elif "TOTAL CALL" in line_upper:
                 v = "".join(filter(str.isdigit, line_clean.split("=")[-1]))
-                if v: hasil["call"] = v
+                if v:
+                    hasil["call"] = v
 
             elif "TOTAL EC" in line_upper:
                 v = "".join(filter(str.isdigit, line_clean.split("=")[-1]))
-                if v: hasil["ec"] = v
+                if v:
+                    hasil["ec"] = v
 
         if "nama" in hasil:
             hasil_list.append(hasil)
@@ -250,7 +282,8 @@ def parse_semua_laporan(text):
 # -----------------------------------------------------------------
 # TELEGRAM HANDLERS
 # -----------------------------------------------------------------
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_start(update, context):
+    """Handler for /start command."""
     await update.message.reply_text(
         "SPG Reporting Bot\n\n"
         "Cara penggunaan:\n\n"
@@ -260,7 +293,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "TOTAL CALL    = 40\n"
         "TOTAL EC      = 12\n\n"
         "[2] Status Absensi:\n"
-        "Ketik: maria sakit | agus off | novi ijin\n\n"
+        "Ketik: rina sakit | budi off | dewi ijin\n\n"
         "[3] Libur Massal:\n"
         "Ketik: semua off\n\n"
         "[4] Daftar SPG:\n"
@@ -268,14 +301,16 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def cmd_daftar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_daftar(update, context):
+    """Handler for /daftar command — show all SPG."""
     lines = ["Daftar SPG Aktif:\n"]
     for spg in SPG_DATA.values():
         lines.append(f"- {spg['nama']} ({spg['program']})")
     await update.message.reply_text("\n".join(lines))
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update, context):
+    """Main handler for all incoming text messages."""
     text  = update.message.text.strip()
     lower = text.lower()
 
@@ -308,16 +343,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             try:
                 input_ke_sheet(
-                    spg=spg, keterangan="HADIR",
+                    spg=spg,
+                    keterangan="HADIR",
                     selling=data.get("selling"),
                     call=data.get("call"),
                     ec=data.get("ec"),
                 )
                 hasil_lines.append(
                     f"OK {spg['nama']}\n"
-                    f"   Selling: {data.get('selling','-')} | "
-                    f"Call: {data.get('call','-')} | "
-                    f"EC: {data.get('ec','-')}\n"
+                    f"   Selling: {data.get('selling', '-')} | "
+                    f"Call: {data.get('call', '-')} | "
+                    f"EC: {data.get('ec', '-')}\n"
                 )
             except Exception as exc:
                 logger.error("Error %s: %s", spg["nama"], exc)
@@ -345,18 +381,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
     # 4. TIDAK DIKENALI
-    await update.message.reply_text("Pesan tidak dikenali. Ketik /start untuk panduan.")
+    await update.message.reply_text(
+        "Pesan tidak dikenali. Ketik /start untuk panduan."
+    )
 
 
 # -----------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------
 def main():
+    """Entry point — build and run the Telegram bot."""
     logger.info("Starting SPG Reporting Bot...")
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start",  cmd_start))
+
+    app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("daftar", cmd_daftar))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
     logger.info("Bot is running. Press Ctrl+C to stop.")
     app.run_polling()
 
