@@ -1,0 +1,41 @@
+﻿# ============================================================
+# .gitignore — SPG Reporting Bot
+# ============================================================
+
+# Environment & Credentials (JANGAN pernah di-commit!)
+.env
+*.json
+!package.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
